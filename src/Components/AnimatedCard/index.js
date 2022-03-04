@@ -8,13 +8,17 @@ import {
     Animated,
     TouchableWithoutFeedback
 } from 'react-native';
+import { useDispatch } from 'react-redux';
+import actionTypes from '../../StateManagement/actionTypes';
+import { useIsComplete, useIsSelected, useWillCompleteSet } from '../../StateManagement/hooks';
 import { vh, vw } from '../../Units';
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 const FlipableView = props => {
+    const dispatch = useDispatch()
+    const isSelected = useIsSelected(props.card)
+    const willComplete = useWillCompleteSet(props.card)
+    const isCompleted = useIsComplete(props.card)
     var timer = null;
-
-    const [flipped, setFlipped] = useState(false);
-    // var flipped = false
     const animatedValue = new Animated.Value(0);
     var val = 0
     const frontInterpolate = animatedValue.interpolate({
@@ -41,54 +45,59 @@ const FlipableView = props => {
             animatedValue?.removeAllListeners();
         };
     }, [])
+    useEffect(() => {
+        if (isSelected || isCompleted) {
+            show()
+        } else {
+            hide()
+        }
+    }, [isSelected])
+    useEffect(() => {
+        if (isCompleted) {
+            show()
+        }
+    }, [isCompleted])
     const clearTimer = () => {
-        if(timer != null){
+        if (timer != null) {
             clearTimeout(timer)
             timer = null
         }
     }
     const show = () => {
-        Animated.spring(animatedValue, {
-            toValue: 180,
-            friction: 8,
-            tension: 10,
-            useNativeDriver: false
-        }).start(() => {
-            setTimeout(() => {
-                if(props?.onSelect){
-                    props?.onSelect()
-                }
-            },500)
-           clearTimer()
-           timer = setTimeout(() => {
-               hide()
-            },1000)
-        });
+        if (animatedValue._value < 180) {
+            Animated.spring(animatedValue, {
+                toValue: 180,
+                friction: 8,
+                tension: 10,
+                useNativeDriver: false
+            }).start(() => {
+            });
+        }
     }
     const hide = () => {
-        Animated.spring(animatedValue, {
-            toValue: 0,
-            friction: 8,
-            tension: 10,
-            useNativeDriver: false
-        }).start(() => {
-            setTimeout(() => {
-                if(props?.unSelect){
-                    props?.unSelect()
-                }
-            },500)
-            clearTimer()
-        });
+        if (animatedValue._value > 0) {
+            Animated.spring(animatedValue, {
+                toValue: 0,
+                friction: 8,
+                tension: 10,
+                useNativeDriver: false
+            }).start(() => {
+            });
+        }
     }
     const flip = () => {
-        if (flipped) {
-            hide()
-        } else {
-            show()
+        if (isCompleted) {
+            return
         }
-        setTimeout(() => {
-            setFlipped(!flipped)
-        }, 400)
+        if (isSelected) {
+            dispatch({ type: actionTypes.unSelectCard, card: props.card })
+        } else {
+            dispatch({ type: actionTypes.unSelectFirst })
+            if (willComplete) {
+                dispatch({ type: actionTypes.markComplete, card: props.card })
+            }
+            dispatch({ type: actionTypes.selectCard, card: props.card })
+        }
     }
     const frontAnimatedStyle = {
         transform: [
@@ -102,6 +111,8 @@ const FlipableView = props => {
         ],
         opacity: backOpacity
     }
+
+    console.log('isCompleted : ', isCompleted)
     return (
         <TouchableOpacity onPress={flip} style={styles.container}>
             <Animated.View style={[styles.flipCard, frontAnimatedStyle]}>
@@ -111,7 +122,7 @@ const FlipableView = props => {
             </Animated.View>
             <Animated.View style={[styles.flipCard, styles.flipCardBack, backAnimatedStyle]}>
                 <Text style={styles.flipText}>
-                    {props.number}
+                    {props.card.number}
                 </Text>
             </Animated.View>
         </TouchableOpacity>
